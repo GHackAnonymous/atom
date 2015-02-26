@@ -1145,7 +1145,7 @@ class DisplayBuffer extends Model
         if @isSoftWrapped()
           while wrapScreenColumn = tokenizedLine.findWrapColumn(@getSoftWrapColumn())
             [wrappedLine, tokenizedLine] = tokenizedLine.softWrapAt(wrapScreenColumn)
-            break if wrappedLine.hasOnlySoftWrapIndentation()
+            break if wrappedLine.isEmpty()
             screenLines.push(wrappedLine)
             softWraps++
         screenLines.push(tokenizedLine)

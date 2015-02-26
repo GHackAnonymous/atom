@@ -119,6 +119,8 @@ class TokenizedLine
     Math.round(@tabLength * oddIndentLevel)
 
   buildSoftWrapIndentationTokens: (token) ->
+    return [] unless token
+
     indentTokens = [0...Math.floor(@indentLevel)].map =>
       token.buildSoftWrapIndentationToken(@tabLength)
 
@@ -182,6 +184,9 @@ class TokenizedLine
 
   buildSoftWrapIndentationDelta: ->
     _.reduce @softWrapIndentationTokens, ((acc, token) -> acc + token.screenDelta), 0
+
+  isEmpty: ->
+    @tokens.length == 0 || @hasOnlySoftWrapIndentation()
 
   hasOnlySoftWrapIndentation: ->
     @tokens.length == @softWrapIndentationTokens.length
