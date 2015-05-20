@@ -24,7 +24,7 @@ TextEditorElement = require '../src/text-editor-element'
 TokenizedBuffer = require '../src/tokenized-buffer'
 TextEditorComponent = require '../src/text-editor-component'
 pathwatcher = require 'pathwatcher'
-clipboard = require 'clipboard'
+clipboard = require '../src/safe-clipboard'
 
 atom.themes.loadBaseStylesheets()
 atom.themes.requireStylesheet '../static/jasmine'
@@ -51,7 +51,7 @@ Object.defineProperty document, 'title',
 
 jasmine.getEnv().addEqualityTester(_.isEqual) # Use underscore's definition of equality for toEqual assertions
 
-if process.env.JANKY_SHA1 and process.platform is 'win32'
+if process.env.CI
   jasmine.getEnv().defaultTimeoutInterval = 60000
 else
   jasmine.getEnv().defaultTimeoutInterval = 5000
@@ -69,10 +69,9 @@ if specDirectory
     specPackageName = JSON.parse(fs.readFileSync(path.join(specPackagePath, 'package.json')))?.name
   specProjectPath = path.join(specDirectory, 'fixtures')
 
-isCoreSpec = specDirectory == fs.realpathSync(__dirname)
+isCoreSpec = specDirectory is fs.realpathSync(__dirname)
 
 beforeEach ->
-  Grim.clearDeprecations() if isCoreSpec
   $.fx.off = true
   documentTitle = null
   projectPath = specProjectPath ? path.join(@specDirectory, 'fixtures')
@@ -141,6 +140,8 @@ beforeEach ->
   spyOn(clipboard, 'writeText').andCallFake (text) -> clipboardContent = text
   spyOn(clipboard, 'readText').andCallFake -> clipboardContent
 
+  spyOn(atom.packages, 'uninstallAutocompletePlus')
+
   addCustomMatchers(this)
 
 afterEach ->
@@ -164,7 +165,6 @@ afterEach ->
 
   jasmine.unspy(atom, 'saveSync')
   ensureNoPathSubscriptions()
-  atom.grammars.clearObservers()
   waits(0) # yield to ui thread to make screen update more frequently
 
 ensureNoPathSubscriptions = ->
@@ -235,7 +235,7 @@ addCustomMatchers = (spec) ->
       else
         notText = if @isNot then " not" else ""
         this.message = => "Expected object with length #{@actual.length} to#{notText} have length #{expected}"
-        @actual.length == expected
+        @actual.length is expected
 
     toExistOnDisk: (expected) ->
       notText = this.isNot and " not" or ""
@@ -298,7 +298,7 @@ window.mousemoveEvent = (properties={}) ->
 
 window.waitsForPromise = (args...) ->
   if args.length > 1
-    { shouldReject, timeout } = args[0]
+    {shouldReject, timeout} = args[0]
   else
     shouldReject = false
   fn = _.last(args)
@@ -313,7 +313,7 @@ window.waitsForPromise = (args...) ->
     else
       promise.then(moveOn)
       promise.catch.call promise, (error) ->
-        jasmine.getEnv().currentSpec.fail("Expected promise to be resolved, but it was rejected with #{jasmine.pp(error)}")
+        jasmine.getEnv().currentSpec.fail("Expected promise to be resolved, but it was rejected with: #{error?.message} #{jasmine.pp(error)}")
         moveOn()
 
 window.resetTimeouts = ->
@@ -329,7 +329,7 @@ window.fakeSetTimeout = (callback, ms) ->
   id
 
 window.fakeClearTimeout = (idToClear) ->
-  window.timeouts = window.timeouts.filter ([id]) -> id != idToClear
+  window.timeouts = window.timeouts.filter ([id]) -> id isnt idToClear
 
 window.fakeSetInterval = (callback, ms) ->
   id = ++window.intervalCount
@@ -359,7 +359,7 @@ window.pagePixelPositionForPoint = (editorView, point) ->
   point = Point.fromObject point
   top = editorView.renderedLines.offset().top + point.row * editorView.lineHeight
   left = editorView.renderedLines.offset().left + point.column * editorView.charWidth - editorView.renderedLines.scrollLeft()
-  { top, left }
+  {top, left}
 
 window.tokensText = (tokens) ->
   _.pluck(tokens, 'value').join('')
@@ -370,7 +370,7 @@ window.setEditorWidthInChars = (editorView, widthInChars, charWidth=editorView.c
 
 window.setEditorHeightInLines = (editorView, heightInLines, lineHeight=editorView.lineHeight) ->
   editorView.height(editorView.getEditor().getLineHeightInPixels() * heightInLines)
-  editorView.component?.measureHeightAndWidth()
+  editorView.component?.measureDimensions()
 
 $.fn.resultOfTrigger = (type) ->
   event = $.Event(type)

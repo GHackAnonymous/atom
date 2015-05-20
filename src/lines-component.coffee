@@ -4,7 +4,6 @@ _ = require 'underscore-plus'
 
 CursorsComponent = require './cursors-component'
 HighlightsComponent = require './highlights-component'
-OverlayManager = require './overlay-manager'
 
 DummyLineNode = $$(-> @div className: 'line', style: 'position: absolute; visibility: hidden;', => @span 'x')[0]
 AcceptFilter = {acceptNode: -> NodeFilter.FILTER_ACCEPT}
@@ -30,27 +29,21 @@ class LinesComponent
     @domNode.classList.add('lines')
 
     @cursorsComponent = new CursorsComponent(@presenter)
-    @domNode.appendChild(@cursorsComponent.domNode)
+    @domNode.appendChild(@cursorsComponent.getDomNode())
 
     @highlightsComponent = new HighlightsComponent(@presenter)
-    @domNode.appendChild(@highlightsComponent.domNode)
+    @domNode.appendChild(@highlightsComponent.getDomNode())
 
     if @useShadowDOM
       insertionPoint = document.createElement('content')
       insertionPoint.setAttribute('select', '.overlayer')
       @domNode.appendChild(insertionPoint)
 
-      insertionPoint = document.createElement('content')
-      insertionPoint.setAttribute('select', 'atom-overlay')
-      @overlayManager = new OverlayManager(@hostElement)
-      @domNode.appendChild(insertionPoint)
-    else
-      @overlayManager = new OverlayManager(@domNode)
+  getDomNode: ->
+    @domNode
 
-    @updateSync(visible)
-
-  updateSync: ->
-    @newState = @presenter.state.content
+  updateSync: (state) ->
+    @newState = state.content
     @oldState ?= {lines: {}}
 
     if @newState.scrollHeight isnt @oldState.scrollHeight
@@ -81,16 +74,15 @@ class LinesComponent
       @domNode.style.width = @newState.scrollWidth + 'px'
       @oldState.scrollWidth = @newState.scrollWidth
 
-    @cursorsComponent.updateSync()
-    @highlightsComponent.updateSync()
-
-    @overlayManager?.render(@presenter)
+    @cursorsComponent.updateSync(state)
+    @highlightsComponent.updateSync(state)
 
     @oldState.indentGuidesVisible = @newState.indentGuidesVisible
     @oldState.scrollWidth = @newState.scrollWidth
 
   removeLineNodes: ->
     @removeLineNode(id) for id of @oldState.lines
+    return
 
   removeLineNode: (id) ->
     @lineNodesByLineId[id].remove()
@@ -127,6 +119,8 @@ class LinesComponent
       lineNode = newLineNodes[i]
       @lineNodesByLineId[id] = lineNode
       @domNode.appendChild(lineNode)
+
+    return
 
   buildLineHTML: (id) ->
     {scrollWidth} = @newState

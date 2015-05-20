@@ -5,7 +5,7 @@ module.exports =
 class HighlightsComponent
   oldState: null
 
-  constructor: (@presenter) ->
+  constructor: ->
     @highlightNodesById = {}
     @regionNodesByHighlightId = {}
 
@@ -17,8 +17,11 @@ class HighlightsComponent
       insertionPoint.setAttribute('select', '.underlayer')
       @domNode.appendChild(insertionPoint)
 
-  updateSync: ->
-    newState = @presenter.state.content.highlights
+  getDomNode: ->
+    @domNode
+
+  updateSync: (state) ->
+    newState = state.content.highlights
     @oldState ?= {}
 
     # remove highlights
@@ -38,6 +41,8 @@ class HighlightsComponent
         @regionNodesByHighlightId[id] = {}
         @domNode.appendChild(highlightNode)
       @updateHighlightNode(id, highlightState)
+
+    return
 
   updateHighlightNode: (id, newHighlightState) ->
     highlightNode = @highlightNodesById[id]
@@ -91,6 +96,8 @@ class HighlightsComponent
             regionNode.style[property] = newRegionState[property] + 'px'
           else
             regionNode.style[property] = ''
+
+    return
 
   flashHighlightNodeIfRequested: (id, newHighlightState) ->
     oldHighlightState = @oldState[id]

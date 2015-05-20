@@ -352,7 +352,7 @@ describe "TokenizedBuffer", ->
         tabAsSpaces = _.multiplyString(' ', tokenizedBuffer.getTabLength())
         screenLine0 = tokenizedBuffer.tokenizedLineForRow(0)
         expect(screenLine0.text).toBe "# Econ 101#{tabAsSpaces}"
-        { tokens } = screenLine0
+        {tokens} = screenLine0
 
         expect(tokens.length).toBe 4
         expect(tokens[0].value).toBe "#"
@@ -452,7 +452,7 @@ describe "TokenizedBuffer", ->
     it "renders each UTF-8 surrogate pair as its own atomic token", ->
       screenLine0 = tokenizedBuffer.tokenizedLineForRow(0)
       expect(screenLine0.text).toBe "'abc\uD835\uDF97def'"
-      { tokens } = screenLine0
+      {tokens} = screenLine0
 
       expect(tokens.length).toBe 5
       expect(tokens[0].value).toBe "'"
@@ -464,7 +464,7 @@ describe "TokenizedBuffer", ->
 
       screenLine1 = tokenizedBuffer.tokenizedLineForRow(1)
       expect(screenLine1.text).toBe "//\uD835\uDF97xyz"
-      { tokens } = screenLine1
+      {tokens} = screenLine1
 
       expect(tokens.length).toBe 4
       expect(tokens[0].value).toBe '//'
@@ -611,7 +611,8 @@ describe "TokenizedBuffer", ->
       tokenizedBuffer = new TokenizedBuffer({buffer})
       fullyTokenize(tokenizedBuffer)
 
-      tokenizedBuffer.setInvisibles(space: 'S', tab: 'T')
+      atom.config.set("editor.showInvisibles", true)
+      atom.config.set("editor.invisibles", space: 'S', tab: 'T')
       fullyTokenize(tokenizedBuffer)
 
       expect(tokenizedBuffer.tokenizedLineForRow(0).text).toBe "SST Sa line with tabsTand T spacesSTS"
@@ -623,7 +624,7 @@ describe "TokenizedBuffer", ->
       tokenizedBuffer = new TokenizedBuffer({buffer})
 
       atom.config.set('editor.showInvisibles', true)
-      tokenizedBuffer.setInvisibles(cr: 'R', eol: 'N')
+      atom.config.set("editor.invisibles", cr: 'R', eol: 'N')
       fullyTokenize(tokenizedBuffer)
 
       expect(tokenizedBuffer.tokenizedLineForRow(0).endOfLineInvisibles).toEqual ['R', 'N']
@@ -634,7 +635,7 @@ describe "TokenizedBuffer", ->
       expect(left.endOfLineInvisibles).toBe null
       expect(right.endOfLineInvisibles).toEqual ['R', 'N']
 
-      tokenizedBuffer.setInvisibles(cr: 'R', eol: false)
+      atom.config.set("editor.invisibles", cr: 'R', eol: false)
       expect(tokenizedBuffer.tokenizedLineForRow(0).endOfLineInvisibles).toEqual ['R']
       expect(tokenizedBuffer.tokenizedLineForRow(1).endOfLineInvisibles).toEqual []
 
@@ -688,7 +689,8 @@ describe "TokenizedBuffer", ->
     it "sets leading and trailing whitespace correctly on a line with invisible characters that is copied", ->
       buffer.setText("  \t a line with tabs\tand \tspaces \t ")
 
-      tokenizedBuffer.setInvisibles(space: 'S', tab: 'T')
+      atom.config.set("editor.showInvisibles", true)
+      atom.config.set("editor.invisibles", space: 'S', tab: 'T')
       fullyTokenize(tokenizedBuffer)
 
       line = tokenizedBuffer.tokenizedLineForRow(0).copy()
@@ -696,7 +698,8 @@ describe "TokenizedBuffer", ->
       expect(line.tokens[line.tokens.length - 1].firstTrailingWhitespaceIndex).toBe 0
 
     it "sets the ::firstNonWhitespaceIndex and ::firstTrailingWhitespaceIndex correctly when tokens are split for soft-wrapping", ->
-      tokenizedBuffer.setInvisibles(space: 'S')
+      atom.config.set("editor.showInvisibles", true)
+      atom.config.set("editor.invisibles", space: 'S')
       buffer.setText(" token ")
       fullyTokenize(tokenizedBuffer)
       token = tokenizedBuffer.tokenizedLines[0].tokens[0]
@@ -878,3 +881,25 @@ describe "TokenizedBuffer", ->
       expect(tokenizedBuffer.tokenizedLineForRow(6).foldable).toBe true
       expect(tokenizedBuffer.tokenizedLineForRow(7).foldable).toBe false
       expect(tokenizedBuffer.tokenizedLineForRow(8).foldable).toBe false
+
+  describe "when the buffer is configured with the null grammar", ->
+    it "uses the placeholder tokens and does not actually tokenize using the grammar", ->
+      spyOn(atom.grammars.nullGrammar, 'tokenizeLine').andCallThrough()
+      buffer = atom.project.bufferForPathSync('sample.will-use-the-null-grammar')
+      buffer.setText('a\nb\nc')
+
+      tokenizedBuffer = new TokenizedBuffer({buffer})
+      tokenizeCallback = jasmine.createSpy('onDidTokenize')
+      tokenizedBuffer.onDidTokenize(tokenizeCallback)
+
+      fullyTokenize(tokenizedBuffer)
+
+      expect(tokenizeCallback.callCount).toBe 1
+      expect(atom.grammars.nullGrammar.tokenizeLine.callCount).toBe 0
+
+      expect(tokenizedBuffer.tokenizedLineForRow(0).tokens.length).toBe 1
+      expect(tokenizedBuffer.tokenizedLineForRow(0).tokens[0].value).toBe 'a'
+      expect(tokenizedBuffer.tokenizedLineForRow(1).tokens.length).toBe 1
+      expect(tokenizedBuffer.tokenizedLineForRow(1).tokens[0].value).toBe 'b'
+      expect(tokenizedBuffer.tokenizedLineForRow(2).tokens.length).toBe 1
+      expect(tokenizedBuffer.tokenizedLineForRow(2).tokens[0].value).toBe 'c'
