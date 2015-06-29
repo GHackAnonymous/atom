@@ -9,6 +9,7 @@ Grim = require 'grim'
 ServiceHub = require 'service-hub'
 Package = require './package'
 ThemePackage = require './theme-package'
+{isDeprecatedPackage, getDeprecatedPackageMetadata} = require './deprecated-packages'
 
 # Extended: Package manager for coordinating the lifecycle of Atom packages.
 #
@@ -148,6 +149,12 @@ class PackageManager
   # Returns a {Boolean}.
   isBundledPackage: (name) ->
     @getPackageDependencies().hasOwnProperty(name)
+
+  isDeprecatedPackage: (name, version) ->
+    isDeprecatedPackage(name, version)
+
+  getDeprecatedPackageMetadata: (name) ->
+    getDeprecatedPackageMetadata(name)
 
   ###
   Section: Enabling and disabling packages
@@ -307,6 +314,10 @@ class PackageManager
     @uninstallAutocompletePlus()
 
     packagePaths = @getAvailablePackagePaths()
+
+    # TODO: remove after a few atom versions.
+    @migrateSublimeTabsSettings(packagePaths)
+
     packagePaths = packagePaths.filter (packagePath) => not @isPackageDisabled(path.basename(packagePath))
     packagePaths = _.uniq packagePaths, (packagePath) -> path.basename(packagePath)
     @loadPackage(packagePath) for packagePath in packagePaths
@@ -325,6 +336,11 @@ class PackageManager
       catch error
         @handleMetadataError(error, packagePath)
         return null
+
+      unless @isBundledPackage(metadata.name) or Grim.includeDeprecatedAPIs
+        if @isDeprecatedPackage(metadata.name, metadata.version)
+          console.warn "Could not load #{metadata.name}@#{metadata.version} because it uses deprecated APIs that have been removed."
+          return null
 
       if metadata.theme
         pack = new ThemePackage(packagePath, metadata)
@@ -431,6 +447,14 @@ class PackageManager
       ]
       for dirToRemove in dirsToRemove
         @uninstallDirectory(dirToRemove)
+    return
+
+  # TODO: remove this after a few versions
+  migrateSublimeTabsSettings: (packagePaths) ->
+    return if Grim.includeDeprecatedAPIs
+    for packagePath in packagePaths when path.basename(packagePath) is 'sublime-tabs'
+      atom.config.removeAtKeyPath('core.disabledPackages', 'tree-view')
+      atom.config.removeAtKeyPath('core.disabledPackages', 'tabs')
     return
 
   uninstallDirectory: (directory) ->
